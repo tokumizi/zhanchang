@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>战场 · 每日指挥台</title>
+<meta name="theme-color" content="#14110f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="战场">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="icon" href="./icon-180.png">
+<script>
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+<style>
+  :root{
+    --bg:#14110f; --panel:#1d1916; --panel2:#241f1b; --line:#3a322c;
+    --ink:#e9e2d6; --ink2:#b3a695; --ink3:#7c7164;
+    --red:#c0392b; --red2:#e05a48; --jade:#3fa37a; --amber:#d99b2b;
+    --gold:#d4af37; --orange:#d9722b;
+    --serif:"Songti SC","STSong","SimSun",serif;
+    --sans:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 700px at 70% -10%,#2a221c 0%,var(--bg) 60%);
+    color:var(--ink);font-family:var(--sans);min-height:100vh;padding:18px 18px 90px;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1,h2,h3{font-weight:600}
+  .muted{color:var(--ink3)}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;color:var(--ink);
+    background:var(--panel2);padding:7px 12px;font-size:13px;transition:.15s}
+  button:hover{background:#2e2620}
+  .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red2)}
+  .btn-ghost{background:transparent;border:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+
+  /* ===== 顶部 Tab 导航 ===== */
+  .topnav{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+  .brand{font-family:var(--serif);font-size:20px;letter-spacing:.18em;margin-right:8px}
+  .brand .dot{color:var(--red2)}
+  .tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:4px}
+  .tab{background:transparent;color:var(--ink2);padding:7px 16px;border-radius:8px;font-size:14px}
+  .tab.act{background:var(--red);color:#fff}
+  .tab .badge{display:inline-block;min-width:16px;height:16px;line-height:16px;font-size:10px;
+    background:#4a2226;color:var(--red2);border-radius:8px;margin-left:5px;padding:0 4px}
+  .tab.act .badge{background:rgba(0,0,0,.25);color:#fff}
+  .grow{flex:1}
+
+  /* ===== view 切换 ===== */
+  .view{display:none}
+  .view.on{display:block;animation:rise .35s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ===== 指挥台 ===== */
+  .deck{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+  @media(max-width:760px){.deck{grid-template-columns:1fr}}
+  .dial-card{background:radial-gradient(420px 420px at 50% 38%,#241d17,#191512);
+    border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;
+    flex-direction:column;align-items:center}
+  .dial-wrap{position:relative;width:300px;height:300px}
+  .dial-wrap svg{position:absolute;inset:0}
+  #ringRot{transform-origin:150px 150px;animation:spin 240s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .dial-center{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;pointer-events:none}
+  .dial-center .sz{font-size:11px;color:var(--ink3);letter-spacing:.1em}
+  .dial-center .hgz{font-family:var(--serif);font-size:32px;line-height:1;margin:2px 0}
+  .dial-center .hgz .g{color:var(--ink)}.dial-center .hgz .z{color:var(--amber)}
+  .dial-center .now{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .dial-center .dir{font-family:var(--serif);font-size:12px;color:var(--jade);margin-top:3px}
+  .dial-modes{display:flex;gap:6px;margin-bottom:8px}
+  .modebtn{background:var(--panel2);border:1px solid var(--line);padding:5px 18px;font-size:13px;border-radius:18px;color:var(--ink2)}
+  .modebtn.act{background:var(--red);color:#fff;border-color:var(--red)}
+  .dial-status{font-size:11px;color:var(--ink3);margin-top:10px;text-align:center;min-height:14px;max-width:300px}
+  .pillars{display:flex;gap:8px;margin-top:6px}
+  .pillar{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    width:58px;text-align:center;padding:7px 0}
+  .pillar .lab{font-size:10px;color:var(--ink3);margin-bottom:3px}
+  .pillar .gz{font-family:var(--serif);font-size:24px;line-height:1}
+  .pillar .gz .gan{color:var(--ink)}.pillar .gz .zhi{color:var(--ink2)}
+  .pillar.live{border-color:var(--gold)}.pillar.live .lab{color:var(--gold)}
+
+  .deck-right{display:flex;flex-direction:column;gap:14px}
+  .env{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .env .ten{font-size:13px;color:var(--ink2);margin-bottom:5px}
+  .env .ten b{color:var(--gold);font-family:var(--serif);font-size:15px}
+  .env .advice{font-size:16px;line-height:1.5}.env .advice .hot{color:var(--red2);font-weight:600}
+  .banner{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .streak{background:linear-gradient(135deg,#2a2018,#1d1712);border:1px solid #4a3a1e;
+    border-radius:14px;padding:12px 18px;display:flex;align-items:center;gap:12px}
+  .streak .n{font-size:42px;font-family:var(--serif);color:var(--gold);line-height:1}
+  .streak .t{font-size:12px;color:var(--ink2)}.streak.broken .n{color:var(--red2)}
+  .orders{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--red);border-radius:14px;padding:12px 16px}
+  .orders .h{font-size:12px;color:var(--red2);letter-spacing:.12em;margin-bottom:6px}
+  .orders .body{font-size:15px;line-height:1.55}.orders .body b{color:var(--ink)}
+  .mini{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .mini .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .mini .stat{font-size:14px}.mini .stat b{font-family:var(--serif);font-size:20px}
+  .dot-jade{color:var(--jade)}.dot-org{color:var(--orange)}.dot-red{color:var(--red2)}
+
+  .sectitle{display:flex;align-items:center;gap:10px;margin:6px 0 14px}
+  .sectitle h2{font-size:16px;letter-spacing:.04em}
+  .sectitle .line{flex:1;height:1px;background:var(--line)}
+
+  /* ===== 战线卡片 ===== */
+  .fronts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .front{position:relative;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:14px;overflow:hidden}
+  .front .bar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--jade)}
+  .front.s-warm .bar{background:var(--amber)}.front.s-alert .bar{background:var(--orange)}
+  .front.s-fallen .bar{background:var(--red)}
+  .front .nm{font-size:16px;font-weight:600;margin-bottom:3px}
+  .front .order{font-size:12px;color:var(--ink3);margin-bottom:10px;min-height:16px}
+  .front .stat{font-size:13px;margin-bottom:10px}.front .stat .d{font-family:var(--serif);font-size:20px}
+  .s-held .stat .d{color:var(--jade)}.s-warm .stat .d{color:var(--amber)}
+  .s-alert .stat .d{color:var(--orange)}.s-fallen .stat .d{color:var(--red2)}
+  .front .acts button{width:100%;font-size:12px;padding:6px}
+  .front .done{background:var(--jade);color:#06150f}
+  .front.donetoday{border-color:#2e5a45}
+
+  /* ===== 日历 ===== */
+  .calhead{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .calhead .m{font-size:18px;font-family:var(--serif);min-width:120px}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .cal .dow{text-align:center;font-size:11px;color:var(--ink3);padding:4px 0}
+  .cell{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    min-height:82px;padding:6px;cursor:pointer;position:relative;transition:.12s}
+  .cell:hover{border-color:#5a4d42}.cell.out{opacity:.32}
+  .cell.today{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+  .cell .dn{font-size:14px;font-weight:600}
+  .cell .gz{font-family:var(--serif);font-size:12px;color:var(--ink3);float:right}
+  .cell .ev{font-size:10.5px;margin-top:3px;padding:1px 4px;border-radius:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ev.k课程{background:#22303a;color:#9fd0e6}.ev.k打工{background:#2a2433;color:#c4a7e6}
+  .ev.k突发{background:#3a2622;color:#e6a79f}.ev.k死线{background:#3a2030;color:#e69fc4}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--ink3);margin-top:8px;flex-wrap:wrap}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
+  .bosses{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .boss{background:linear-gradient(135deg,#2b1518,#1d1210);border:1px solid #4a2226;
+    border-radius:12px;padding:10px 16px;min-width:140px;cursor:pointer}
+  .boss .t{font-size:13px;color:var(--ink2)}
+  .boss .n{font-size:28px;font-family:var(--serif);color:var(--red2);line-height:1.1}
+  .boss .n small{font-size:13px;color:var(--ink3)}.boss.past{opacity:.5}
+
+  /* ===== modal ===== */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+    align-items:center;justify-content:center;z-index:50;padding:20px}
+  .scrim.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:20px;width:100%;max-width:460px;max-height:86vh;overflow:auto;animation:rise .25s}
+  .modal h3{margin-bottom:14px;font-size:17px}
+  label.f{display:block;font-size:12px;color:var(--ink2);margin:10px 0 4px}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:8px 10px;font-family:inherit;font-size:14px}
+  textarea{resize:vertical;min-height:54px}
+  .mrow{display:flex;gap:8px}.mrow>*{flex:1}
+  .modal .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+  .evlist .item{display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+  .evlist .item small{color:var(--ink3)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
+  .settingrow{display:grid;grid-template-columns:1fr 1.4fr 64px 28px;gap:8px;align-items:center;margin-bottom:8px}
+  .settingrow input{font-size:13px;padding:6px 8px}
+  .note{font-size:11px;color:var(--ink3);line-height:1.5;margin-top:10px}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 顶部导航 -->
+  <div class="topnav">
+    <div class="brand">战<span class="dot">·</span>场</div>
+    <div class="tabs">
+      <button class="tab act" data-v="home" onclick="showView('home')">指挥台</button>
+      <button class="tab" data-v="fronts" onclick="showView('fronts')">战线 <span class="badge" id="tabBadge">0</span></button>
+      <button class="tab" data-v="cal" onclick="showView('cal')">日历</button>
+    </div>
+    <div class="grow"></div>
+    <button class="btn-ghost" onclick="settle()">结算</button>
+  </div>
+
+  <!-- 指挥台 -->
+  <div class="view on" id="view-home">
+    <div class="deck">
+      <div class="dial-card">
+        <div class="dial-modes">
+          <button id="mClock" class="modebtn act" onclick="setMode('clock')">时钟</button>
+          <button id="mCompass" class="modebtn" onclick="setMode('compass')">罗盘</button>
+        </div>
+        <div class="dial-wrap">
+          <svg viewBox="0 0 380 380" id="dialSvg"></svg>
+          <div class="dial-center">
+            <div class="sz" id="dialSz">时柱</div>
+            <div class="hgz" id="dialGz"><span class="g">辛</span><span class="z">巳</span></div>
+            <div class="now" id="dialNow"></div>
+            <div class="dir" id="dialDir"></div>
+          </div>
+        </div>
+        <div class="dial-status" id="dialStatus"></div>
+        <div class="pillars" id="pillars"></div>
+      </div>
+
+      <div class="deck-right">
+        <div class="env">
+          <div class="ten" id="envTen"></div>
+          <div class="advice" id="envAdvice"></div>
+        </div>
+        <div class="banner">
+          <div class="streak" id="streakBox">
+            <div class="n" id="streakN">0</div>
+            <div class="t">连胜<br>无沦陷</div>
+          </div>
+          <div class="orders">
+            <div class="h">今 日 军 令</div>
+            <div class="body" id="orders"></div>
+          </div>
+        </div>
+        <div class="mini">
+          <div class="row">
+            <div class="stat" id="miniStat"></div>
+            <div class="grow"></div>
+            <button class="btn-ghost" onclick="showView('fronts')">进入战线 ›</button>
+            <button class="btn-ghost" onclick="showView('cal')">看日历 ›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 战线 -->
+  <div class="view" id="view-fronts">
+    <div class="sectitle"><h2>习惯战线</h2><div class="line"></div>
+      <button class="btn-ghost" onclick="openSettings()">编辑战线</button>
+      <button class="btn-ghost" onclick="settle()">今日结算</button>
+    </div>
+    <div class="fronts" id="fronts"></div>
+    <div class="toolbar">
+      <button class="btn-ghost" onclick="exportData()">导出战史</button>
+      <button class="btn-ghost" onclick="document.getElementById('importer').click()">导入</button>
+      <input type="file" id="importer" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+
+  <!-- 日历 -->
+  <div class="view" id="view-cal">
+    <div class="sectitle"><h2>大决战 · 倒计时</h2><div class="line"></div></div>
+    <div class="bosses" id="bosses"></div>
+    <div class="sectitle"><h2>战场日历</h2><div class="line"></div>
+      <span class="switch"><input type="checkbox" id="courseToggle" style="width:auto"
+        onchange="toggleCourses(this.checked)"> 本学期课程</span>
+      <button class="btn-ghost" onclick="openCourseEdit()">课程时段</button>
+    </div>
+    <div class="card">
+      <div class="calhead">
+        <button onclick="moveMonth(-1)">‹</button>
+        <div class="m" id="calMonth"></div>
+        <button onclick="moveMonth(1)">›</button>
+        <button class="btn-ghost" onclick="gotoToday()">回到今日</button>
+        <div class="grow"></div>
+        <button class="btn-red" onclick="openEvent()">+ 加事件 / 打工 / 突发</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="legend">
+        <span><i style="background:#3b5563"></i>课程</span>
+        <span><i style="background:#5a4570"></i>打工</span>
+        <span><i style="background:#6e3a30"></i>突发</span>
+        <span><i style="background:#6e2f50"></i>死线/大决战</span>
+        <span class="muted">· 点任意日期可加事件</span>
+      </div>
+    </div>
+    <div class="note" id="gzNote"></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+
+<script>
+/* ===================== 干支 / 节气 / 十神 ===================== */
+const GAN=["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const ZHI=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+const GAN_WX=[0,0,1,1,2,2,3,3,4,4], GAN_YY=[1,0,1,0,1,0,1,0,1,0];
+function jdn(y,m,d){const a=Math.floor((14-m)/12),yy=y+4800-a,mm=m+12*a-3;
+  return d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;}
+function dayPillarIndex(y,m,d){return ((jdn(y,m,d)+49)%60+60)%60;}
+function gz(i){return GAN[((i%10)+10)%10]+ZHI[((i%12)+12)%12];}
+const TERM_C={0:5.4055,1:20.12,2:3.87,3:18.73,4:5.63,5:20.646,6:4.81,7:20.1,8:5.52,9:21.04,
+  10:5.678,11:21.37,12:7.108,13:22.83,14:7.5,15:23.13,16:7.646,17:23.042,18:8.318,19:23.438,
+  20:7.438,21:22.36,22:7.18,23:22.21};
+const TERM_FIX={"2026-3":1,"2021-23":-1,"2002-14":1,"2016-12":1};
+function termDay(year,idx){const y=year%100;let d=Math.floor(y*0.2422+TERM_C[idx])-Math.floor((y-1)/4);
+  const f=TERM_FIX[year+"-"+idx];if(f)d+=f;return d;}
+function termDate(year,idx){return new Date(year,Math.floor(idx/2),termDay(year,idx));}
+const JIE=[[2,2],[4,3],[6,4],[8,5],[10,6],[12,7],[14,8],[16,9],[18,10],[20,11],[22,0],[0,1]];
+function monthBranchIndex(date){let best=null,bestBr=2;
+  for(const yr of [date.getFullYear()-1,date.getFullYear()]) for(const [ti,br] of JIE){
+    const t=termDate(yr,ti); if(t<=date&&(!best||t>best)){best=t;bestBr=br;}}
+  return bestBr;}
+function yearPillarIndex(date){let y=date.getFullYear();
+  if(date<termDate(y,2))y-=1; return ((y-1984)%60+60)%60;}
+function monthPillar(date){const yGan=yearPillarIndex(date)%10,br=monthBranchIndex(date);
+  const yinStem=((yGan%5)*2+2)%10,step=(br-2+12)%12,mGan=(yinStem+step)%10;
+  return {gan:mGan,zhi:br,gz:GAN[mGan]+ZHI[br]};}
+function dayPillarForCivil(date){const i=dayPillarIndex(date.getFullYear(),date.getMonth()+1,date.getDate());
+  return {idx:i,gan:i%10,zhi:i%12,gz:gz(i)};}
+function effectiveDayDate(now){const d=new Date(now);if(now.getHours()>=23)d.setDate(d.getDate()+1);
+  d.setHours(12,0,0,0);return d;}
+function hourBranchIndex(h){return Math.floor((h+1)/2)%12;}
+function hourPillar(dayGan,h){const start=((dayGan%5)*2)%10,br=hourBranchIndex(h);
+  return {gan:(start+br)%10,zhi:br,gz:GAN[(start+br)%10]+ZHI[br]};}
+function tenGod(dayGan,otherGan){const dw=GAN_WX[dayGan],ow=GAN_WX[otherGan];
+  const same=GAN_YY[dayGan]===GAN_YY[otherGan];
+  const sheng=(a,b)=>(a+1)%5===b, ke=(a,b)=>(a+2)%5===b;
+  if(dw===ow)return same?"比肩":"劫财";
+  if(sheng(dw,ow))return same?"食神":"伤官";
+  if(ke(dw,ow))return same?"偏财":"正财";
+  if(ke(ow,dw))return same?"七杀":"正官";
+  if(sheng(ow,dw))return same?"偏印":"正印";return"—";}
+const TEN_ADVICE={
+  "七杀":{hot:1,line:"七杀临身——今日开战，主攻最硬的仗：<b>论文 / 大学院</b>。"},
+  "正官":{hot:1,line:"逢官——按部就班推正事：<b>论文 / 大学院 / 上课</b>。"},
+  "正财":{hot:0,line:"逢财——宜出活换钱：<b>打工 / 无隅世界</b>。"},
+  "偏财":{hot:0,line:"逢偏财——主攻产出与机会：<b>打工 / 无隅世界</b>。"},
+  "正印":{hot:0,line:"逢印——蓄力读书：<b>日语 / 佛学</b>。"},
+  "偏印":{hot:0,line:"逢偏印——宜钻研内省：<b>佛学 / 日语</b>。"},
+  "食神":{hot:0,line:"逢食神——宜表达创作：<b>无隅世界 / 日语作文</b>。"},
+  "伤官":{hot:0,line:"逢伤官——才气外放，宜创作输出：<b>无隅世界</b>。"},
+  "比肩":{hot:0,line:"逢比肩——靠自己硬推，挑最久没碰的死磕。"},
+  "劫财":{hot:0,line:"逢劫财——宜协作借力，也防分心耗散。"}};
+
+/* ===================== 状态 ===================== */
+function fmt(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function parseD(s){const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c);}
+function todayStr(){return fmt(new Date());}
+const DEFAULT={dayMaster:4,
+  fronts:[
+    {id:"lunwen",name:"论文",order:"写 3 句",max:2,history:{}},
+    {id:"riyu",name:"日语",order:"5 句作文",max:2,history:{}},
+    {id:"jianshen",name:"健身",order:"到场一次",max:3,history:{}},
+    {id:"foxue",name:"佛学",order:"1 段读书笔记",max:5,history:{}},
+    {id:"wuyu",name:"无隅世界",order:"1 个选题",max:3,history:{}},
+    {id:"shenghuo",name:"生活整理",order:"丢 3 件",max:4,history:{}}],
+  courses:[{id:"c1",dow:1,start:"10:40",end:"12:10",title:"上课"},
+    {id:"c2",dow:2,start:"14:40",end:"16:10",title:"上课"},
+    {id:"c3",dow:3,start:"16:20",end:"17:40",title:"上课"}],
+  coursesOn:true, events:[], bosses:[]};
+let S=load();
+function load(){try{const r=JSON.parse(localStorage.getItem("zhanchang"));if(r&&r.fronts)return r;}catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT));}
+function save(){localStorage.setItem("zhanchang",JSON.stringify(S));}
+let calCursor=new Date();calCursor.setDate(1);
+
+/* ===================== 战线逻辑 ===================== */
+function lastTouch(f,onStr){let best=null;for(const k in f.history)if(k<=onStr&&(!best||k>best))best=k;return best;}
+function coldDays(f,onStr){const lt=lastTouch(f,onStr);if(!lt)return Infinity;
+  return Math.round((parseD(onStr)-parseD(lt))/86400000);}
+function frontStatus(f){const c=coldDays(f,todayStr());
+  if(f.history[todayStr()])return{cls:"s-held",txt:"今日已据守",c:0};
+  if(c===Infinity)return{cls:"s-fallen",txt:"未开战",c:Infinity};
+  if(c>f.max)return{cls:"s-fallen",txt:"已沦陷",c};
+  if(c===f.max)return{cls:"s-alert",txt:"告急",c};
+  if(c>=Math.ceil(f.max/2))return{cls:"s-warm",txt:"温",c};
+  return{cls:"s-held",txt:"据守",c};}
+function dayHeld(onStr){let any=false;for(const f of S.fronts){const lt=lastTouch(f,onStr);
+  if(!lt)continue;any=true;if(coldDays(f,onStr)>f.max)return false;}return any;}
+function currentStreak(){let n=0,d=new Date();for(let i=0;i<400;i++){
+  if(dayHeld(fmt(d)))n++;else break;d.setDate(d.getDate()-1);}return n;}
+function touch(id){const f=S.fronts.find(x=>x.id===id);f.history[todayStr()]=true;save();render();}
+function untouch(id){const f=S.fronts.find(x=>x.id===id);delete f.history[todayStr()];save();render();}
+
+/* ===================== 日晷 / 罗盘 ===================== */
+const KYOTO={lat:35.0116,lon:135.7681,name:"京都"};
+let GEO={...KYOTO}, MODE="clock", HEADING=null;
+function deg2rad(d){return d*Math.PI/180;}
+function P(cx,cy,r,deg){const a=deg2rad(deg);return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
+const az2svg=a=>90+a;            // 子(北,0°)→SVG90(底)，顺时针；午(南,180)→270(顶)
+function sunAngleClock(h){return 15*h-270;}
+// 后天八卦：名,符,五行,方位角(0北)
+const BG=[["坎","☵","水",0],["艮","☶","土",45],["震","☳","木",90],["巽","☴","木",135],
+  ["离","☲","火",180],["坤","☷","土",225],["兑","☱","金",270],["乾","☰","金",315]];
+const WX={火:"#d9534f",水:"#4a90d9",木:"#4caf72",金:"#cdb583",土:"#c79a4b"};
+// 二十四山：字,类型,方位角
+const SHAN=[["子","支",0],["癸","干",15],["丑","支",30],["艮","维",45],["寅","支",60],["甲","干",75],
+  ["卯","支",90],["乙","干",105],["辰","支",120],["巽","维",135],["巳","支",150],["丙","干",165],
+  ["午","支",180],["丁","干",195],["未","支",210],["坤","维",225],["申","支",240],["庚","干",255],
+  ["酉","支",270],["辛","干",285],["戌","支",300],["乾","维",315],["亥","支",330],["壬","干",345]];
+const DIRNAME={0:"正北",45:"东北",90:"正东",135:"东南",180:"正南",225:"西南",270:"正西",315:"西北"};
+function nearest(az,arr,idx){let best=arr[0],bd=999;for(const x of arr){
+  let d=Math.abs(((az-x[idx]+540)%360)-180);if(d<bd){bd=d;best=x;}}return best;}
+function azInfo(az){const sh=nearest(az,SHAN,2),g=nearest(az,BG,3);
+  return {shan:sh[0],gua:g[0],wx:g[2],dir:DIRNAME[g[3]]};}
+// 太阳真实方位角(0=北,顺时针)
+function solarAzimuth(lat,lon,date){const r=Math.PI/180;
+  const jd=date.getTime()/86400000+2440587.5,n=jd-2451545.0;
+  const L=(280.460+0.9856474*n)%360,g=(357.528+0.9856003*n)%360;
+  const lam=(L+1.915*Math.sin(g*r)+0.020*Math.sin(2*g*r))%360,eps=23.439-0.0000004*n;
+  const dec=Math.asin(Math.sin(eps*r)*Math.sin(lam*r))/r;
+  const ra=Math.atan2(Math.cos(eps*r)*Math.sin(lam*r),Math.cos(lam*r))/r;
+  const gmst=(280.46061837+360.98564736629*n)%360;
+  const H=((gmst+lon-ra)+540)%360-180;
+  const sinEl=Math.sin(lat*r)*Math.sin(dec*r)+Math.cos(lat*r)*Math.cos(dec*r)*Math.cos(H*r);
+  const el=Math.asin(sinEl)/r;
+  let az=Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec*r)-Math.sin(lat*r)*sinEl)/(Math.cos(lat*r)*Math.cos(el*r)))))/r;
+  if(Math.sin(H*r)>0)az=360-az; return {az:((az%360)+360)%360,el};}
+
+function buildDial(){
+  const cx=190,cy=190;let d="";
+  // 八卦彩色扇区
+  for(const b of BG){const c=WX[b[2]],s=az2svg(b[3]-22.5),e=az2svg(b[3]+22.5);
+    const[x1,y1]=P(cx,cy,150,s),[x2,y2]=P(cx,cy,150,e),[x3,y3]=P(cx,cy,108,e),[x4,y4]=P(cx,cy,108,s);
+    d+=`<path d="M${x1} ${y1} A150 150 0 0 1 ${x2} ${y2} L${x3} ${y3} A108 108 0 0 0 ${x4} ${y4} Z" fill="${c}" fill-opacity="0.13" stroke="${c}" stroke-opacity="0.3" stroke-width="0.6"/>`;}
+  for(const r of [108,150,160,176])d+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#4a3f35" stroke-width="0.8"/>`;
+  // 二十四山
+  for(const m of SHAN){const deg=az2svg(m[2]),[tx,ty]=P(cx,cy,168,deg);
+    const col=m[1]==="维"?"#caa24b":m[1]==="干"?"#9a8b76":"#7c7164";
+    d+=`<text x="${tx}" y="${ty+3.5}" text-anchor="middle" font-family="Songti SC,serif" font-size="10" fill="${col}">${m[0]}</text>`;
+    const[a1,b1]=P(cx,cy,160,deg),[a2,b2]=P(cx,cy,176,deg);
+    d+=`<line x1="${a1}" y1="${b1}" x2="${a2}" y2="${b2}" stroke="#4a3f35" stroke-width="0.5"/>`;}
+  // 八卦符号+名
+  for(const b of BG){const deg=az2svg(b[3]),c=WX[b[2]],[sx,sy]=P(cx,cy,130,deg),[gx,gy]=P(cx,cy,146,deg);
+    d+=`<text x="${sx}" y="${sy+2}" text-anchor="middle" font-size="18" fill="${c}">${b[1]}</text>`;
+    d+=`<text x="${gx}" y="${gy+3}" text-anchor="middle" font-family="Songti SC,serif" font-size="8.5" fill="${c}" opacity="0.8">${b[0]}</text>`;}
+  // 十二地支/时辰
+  for(let i=0;i<12;i++){const deg=az2svg(i*30),[x,y]=P(cx,cy,90,deg),hot=(i===6||i===0);
+    d+=`<text x="${x}" y="${y+8}" text-anchor="middle" font-family="Songti SC,serif" font-size="22" fill="${hot?'#d4af37':'#e9e2d6'}">${ZHI[i]}</text>`;}
+  // 旋转盘 + 动态层
+  const svg=`<g id="diskRot">${d}</g>`+
+    `<line id="shadow" x1="190" y1="190" x2="190" y2="60" stroke="#c0392b" stroke-width="2.6" stroke-linecap="round"/>`+
+    `<line id="tail" x1="190" y1="190" x2="190" y2="250" stroke="#6b5a4d" stroke-width="2" stroke-linecap="round"/>`+
+    `<circle id="sun2" r="13" fill="#d4af37" fill-opacity="0.25"/><circle id="sun" r="7" fill="#d4af37"/>`+
+    `<circle id="sec" r="2.4" fill="#e9e2d6"/>`+
+    `<circle cx="190" cy="190" r="5" fill="#1d1916" stroke="#5a4d42" stroke-width="1.5"/>`;
+  document.getElementById("dialSvg").innerHTML=svg;
+}
+function tickDial(){
+  const now=new Date(),h=now.getHours(),mi=now.getMinutes(),se=now.getSeconds(),cx=190,cy=190;
+  const eff=effectiveDayDate(now),dP=dayPillarForCivil(eff),hP=hourPillar(dP.gan,h);
+  const disk=document.getElementById("diskRot");if(!disk)return;
+  const sun=document.getElementById("sun"),sun2=document.getElementById("sun2"),
+    sh=document.getElementById("shadow"),tail=document.getElementById("tail"),sec=document.getElementById("sec");
+  let R=0,sunDeg,needleDeg;
+  if(MODE==="compass"&&HEADING!=null){
+    R=180-HEADING;
+    const sol=solarAzimuth(GEO.lat,GEO.lon,now);
+    sunDeg=270+sol.az-HEADING; needleDeg=270-HEADING;
+    const faceAz=((HEADING%360)+360)%360,info=azInfo(faceAz);
+    document.getElementById("dialSz").textContent="面朝";
+    document.getElementById("dialGz").innerHTML=`<span class="g">${info.shan}</span>`;
+    document.getElementById("dialNow").textContent=`${Math.round(faceAz)}° · ${info.dir}`;
+    document.getElementById("dialDir").innerHTML=`${info.gua}卦 · ${info.wx}　<span style="color:var(--ink3)">${hP.gz}时</span>`;
+    sec.style.display="none";
+  }else{
+    const hf=h+mi/60+se/3600;
+    sunDeg=sunAngleClock(hf); needleDeg=sunDeg+180;
+    const secA=se*6-90,[px,py]=P(cx,cy,88,secA);
+    sec.style.display=""; sec.setAttribute("cx",px); sec.setAttribute("cy",py);
+    document.getElementById("dialSz").textContent="时柱";
+    document.getElementById("dialGz").innerHTML=`<span class="g">${hP.gz[0]}</span><span class="z">${hP.gz[1]}</span>`;
+    document.getElementById("dialNow").textContent=
+      `${String(h).padStart(2,"0")}:${String(mi).padStart(2,"0")}:${String(se).padStart(2,"0")} · ${ZHI[hourBranchIndex(h)]}时`;
+    const info=azInfo(hP.zhi*30);
+    document.getElementById("dialDir").innerHTML=`${info.dir} · ${info.gua} · ${info.wx}`;
+  }
+  disk.setAttribute("transform",`rotate(${R} 190 190)`);
+  const[sx,sy]=P(cx,cy,160,sunDeg);sun.setAttribute("cx",sx);sun.setAttribute("cy",sy);sun2.setAttribute("cx",sx);sun2.setAttribute("cy",sy);
+  const[ex,ey]=P(cx,cy,150,needleDeg);sh.setAttribute("x2",ex);sh.setAttribute("y2",ey);
+  const[tx,ty]=P(cx,cy,70,needleDeg+180);tail.setAttribute("x2",tx);tail.setAttribute("y2",ty);
+}
+function setMode(m){
+  if(m==="compass")enableCompass();
+  MODE=m;
+  document.getElementById("mClock").classList.toggle("act",m==="clock");
+  document.getElementById("mCompass").classList.toggle("act",m==="compass");
+  updateStatus();tickDial();
+}
+function updateStatus(){const s=document.getElementById("dialStatus");if(!s)return;
+  if(MODE==="clock"){s.innerHTML="时钟模式 · 南上固定 · 太阳走时辰";return;}
+  if(HEADING==null)s.innerHTML='<span style="color:var(--orange)">罗盘待启…需手机并允许「方向」权限（电脑无指南针硬件）</span>';
+  else s.innerHTML=`罗盘模式 · 真北已锁 · ${GEO.name||GEO.lat.toFixed(2)+'°,'+GEO.lon.toFixed(2)+'°'} 太阳真位`;}
+function enableCompass(){
+  if(navigator.geolocation)navigator.geolocation.getCurrentPosition(
+    p=>{GEO={lat:p.coords.latitude,lon:p.coords.longitude,name:""};updateStatus();},()=>{},{timeout:8000});
+  const listen=()=>{window.addEventListener("deviceorientation",onOrient,true);
+    window.addEventListener("deviceorientationabsolute",onOrient,true);};
+  if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function")
+    DeviceOrientationEvent.requestPermission().then(r=>{if(r==="granted")listen();updateStatus();}).catch(()=>{});
+  else listen();
+}
+function onOrient(e){let hd=null;
+  if(e.webkitCompassHeading!=null)hd=e.webkitCompassHeading;
+  else if(e.absolute&&e.alpha!=null)hd=(360-e.alpha)%360;
+  if(hd!=null){HEADING=hd;if(MODE==="compass"){tickDial();updateStatus();}}}
+
+/* ===================== 渲染 ===================== */
+function render(){renderTop();renderBanner();renderFronts();renderMini();renderBosses();renderCal();renderNote();
+  document.getElementById("courseToggle").checked=S.coursesOn;tickDial();}
+function renderTop(){
+  const now=new Date(),eff=effectiveDayDate(now);
+  const yP=yearPillarIndex(eff),mP=monthPillar(eff),dP=dayPillarForCivil(eff),hP=hourPillar(dP.gan,now.getHours());
+  const data=[["年",gz(yP)],["月",mP.gz],["日",dP.gz],["时",hP.gz]];
+  document.getElementById("pillars").innerHTML=data.map((p,i)=>
+    `<div class="pillar ${i===3?'live':''}"><div class="lab">${p[0]}</div>
+     <div class="gz"><span class="gan">${p[1][0]}</span><span class="zhi">${p[1][1]}</span></div></div>`).join("");
+  const dm=S.dayMaster,dayTen=tenGod(dm,dP.gan),hourTen=tenGod(dm,hP.gan);
+  document.getElementById("envTen").innerHTML=
+    `日主 <b>${GAN[dm]}</b>土　今日日干 ${GAN[dP.gan]}→<b>${dayTen}</b>　此刻时干 ${GAN[hP.gan]}→<b>${hourTen}</b>`;
+  const adv=TEN_ADVICE[dayTen]||{line:"按军令推进。"};
+  document.getElementById("envAdvice").innerHTML=(adv.hot?'<span class="hot">⚔ ':'<span>')+adv.line+'</span>';
+}
+function rankFronts(){return S.fronts.map(f=>({f,st:frontStatus(f)}));}
+function renderBanner(){
+  const s=currentStreak();document.getElementById("streakN").textContent=s;
+  document.getElementById("streakBox").classList.toggle("broken",s===0);
+  const urgent=rankFronts().filter(x=>["已沦陷","告急","未开战"].includes(x.st.txt))
+    .sort((a,b)=>(b.st.c===Infinity?9999:b.st.c)-(a.st.c===Infinity?9999:a.st.c)).slice(0,3);
+  let html=urgent.length?urgent.map(x=>{
+    const tag=x.st.txt==="已沦陷"?`<span style="color:var(--red2)">已沦陷 ${x.st.c}天</span>`
+      :x.st.txt==="告急"?`<span style="color:var(--orange)">告急 ${x.st.c}天</span>`
+      :`<span style="color:var(--ink3)">未开战</span>`;
+    return `驰援 <b>${x.f.name}</b>（${x.f.order}）— ${tag}`;}).join("<br>")
+    :"全线据守。按十神主攻方向自由出击即可。";
+  document.getElementById("orders").innerHTML=html;
+}
+function renderMini(){
+  const r=rankFronts();
+  const held=r.filter(x=>["今日已据守","据守","温"].includes(x.st.txt)).length;
+  const alert=r.filter(x=>x.st.txt==="告急").length;
+  const fallen=r.filter(x=>["已沦陷","未开战"].includes(x.st.txt)).length;
+  document.getElementById("miniStat").innerHTML=
+    `战线 ${S.fronts.length} 条　<span class="dot-jade stat"><b>${held}</b> 据守</span>　`+
+    `<span class="dot-org stat"><b>${alert}</b> 告急</span>　<span class="dot-red stat"><b>${fallen}</b> 危/未战</span>`;
+  document.getElementById("tabBadge").textContent=alert+fallen;
+  document.getElementById("tabBadge").style.display=(alert+fallen)?"inline-block":"none";
+}
+function renderFronts(){
+  document.getElementById("fronts").innerHTML=S.fronts.map(f=>{
+    const st=frontStatus(f),done=!!f.history[todayStr()],dtxt=st.c===Infinity?'∞':st.c,cls=st.cls;
+    return `<div class="front ${cls} ${done?'donetoday':''}"><div class="bar"></div>
+      <div class="nm">${f.name}</div><div class="order">军令：${f.order}</div>
+      <div class="stat"><span class="d">${done?'✓':dtxt}</span>
+        ${done?' 今日已据守':` 天没碰 · <span class="muted">${st.txt}</span>`}</div>
+      <div class="acts">${done?`<button onclick="untouch('${f.id}')">撤销</button>`
+        :`<button class="done" onclick="touch('${f.id}')">出击 ✓</button>`}</div></div>`;
+  }).join("");
+}
+function renderBosses(){
+  const today=parseD(todayStr()),arr=[...S.bosses].sort((a,b)=>a.date.localeCompare(b.date));
+  let html=arr.map(b=>{const dd=Math.round((parseD(b.date)-today)/86400000),past=dd<0;
+    return `<div class="boss ${past?'past':''}" onclick="openBoss('${b.id}')"><div class="t">${b.title}</div>
+      <div class="n">${past?'已过':dd}<small>${past?'':' 天'}</small></div><div class="t muted">${b.date}</div></div>`;}).join("");
+  html+=`<div class="boss" style="display:flex;align-items:center;justify-content:center;color:var(--ink3)" onclick="openBoss()">＋ 大决战</div>`;
+  document.getElementById("bosses").innerHTML=html;
+}
+
+/* ===================== 日历 ===================== */
+function eventsOn(dStr){const out=[],dow=parseD(dStr).getDay();
+  if(S.coursesOn)for(const c of S.courses)if(c.dow===dow)out.push({type:"课程",title:c.title,start:c.start});
+  for(const e of S.events)if(e.date===dStr)out.push(e);
+  for(const b of S.bosses)if(b.date===dStr)out.push({type:"死线",title:"⚑ "+b.title});return out;}
+function renderCal(){
+  const y=calCursor.getFullYear(),m=calCursor.getMonth();
+  document.getElementById("calMonth").textContent=`${y} 年 ${m+1} 月`;
+  const startDow=new Date(y,m,1).getDay(),start=new Date(y,m,1-startDow);
+  const dows=["日","一","二","三","四","五","六"];
+  let html=dows.map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);
+    const ds=fmt(d),out=d.getMonth()!==m,dp=dayPillarForCivil(d),evs=eventsOn(ds);
+    const evHtml=evs.slice(0,3).map(e=>`<div class="ev k${e.type}">${e.start?e.start+' ':''}${e.title}</div>`).join("")
+      +(evs.length>3?`<div class="ev muted">+${evs.length-3}</div>`:"");
+    html+=`<div class="cell ${out?'out':''} ${ds===todayStr()?'today':''}" onclick="openEvent(null,'${ds}')">
+      <span class="gz">${dp.gz}</span><div class="dn">${d.getDate()}</div>${evHtml}</div>`;}
+  document.getElementById("cal").innerHTML=html;
+}
+function moveMonth(n){calCursor.setMonth(calCursor.getMonth()+n);renderCal();}
+function gotoToday(){calCursor=new Date();calCursor.setDate(1);renderCal();}
+function renderNote(){document.getElementById("gzNote").innerHTML=
+  "干支：日柱用儒略日公式精确推算；月/年柱按节气（通用寿星公式）换柱，子时按 23 点换日。节令临界日建议对照专业排盘。十神以你戊土日主为参照，仅作每日方向提示。";}
+
+/* ===================== view ===================== */
+function showView(v){
+  document.querySelectorAll(".view").forEach(e=>e.classList.toggle("on",e.id==="view-"+v));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("act",t.dataset.v===v));
+  if(v==="cal")renderCal();window.scrollTo(0,0);
+}
+
+/* ===================== 弹窗 ===================== */
+const scrim=document.getElementById("scrim"),modal=document.getElementById("modal");
+scrim.onclick=e=>{if(e.target===scrim)closeM();};
+function closeM(){scrim.classList.remove("on");modal.innerHTML="";}
+function openM(html){modal.innerHTML=html;scrim.classList.add("on");}
+function openEvent(id,dateStr){const e=id?S.events.find(x=>x.id===id):null,d=e?e.date:(dateStr||todayStr());
+  openM(`<h3>${e?'编辑事件':'添加事件'}</h3>
+    <label class="f">日期</label><input id="ev_date" type="date" value="${d}">
+    <label class="f">类型</label><select id="ev_type">
+      <option value="打工" ${e&&e.type==='打工'?'selected':''}>打工</option>
+      <option value="突发" ${e&&e.type==='突发'?'selected':''}>突发事件</option>
+      <option value="死线" ${e&&e.type==='死线'?'selected':''}>死线 / 截止</option></select>
+    <label class="f">标题</label><input id="ev_title" value="${e?e.title:''}" placeholder="如：便利店班 / 见导师">
+    <div class="mrow"><div><label class="f">开始</label><input id="ev_start" type="time" value="${e?e.start||'':''}"></div>
+      <div><label class="f">结束</label><input id="ev_end" type="time" value="${e?e.end||'':''}"></div></div>
+    <label class="f">备注</label><textarea id="ev_note">${e?e.note||'':''}</textarea>
+    <div class="foot">${e?`<button onclick="delEvent('${id}')" style="margin-right:auto;color:var(--red2)">删除</button>`:''}
+      <button class="btn-ghost" onclick="closeM()">取消</button>
+      <button class="btn-red" onclick="saveEvent('${id||''}')">保存</button></div>
+    ${!id?renderDayEventList(d):''}`);}
+function renderDayEventList(d){const evs=S.events.filter(x=>x.date===d);if(!evs.length)return"";
+  return `<div style="margin-top:14px"><div class="f">当天已有</div><div class="evlist">`+
+    evs.map(e=>`<div class="item"><span>${e.start?e.start+' ':''}<b>${e.title}</b> <small>${e.type}</small></span>
+      <button onclick="openEvent('${e.id}')">改</button></div>`).join("")+`</div></div>`;}
+function saveEvent(id){const o={date:document.getElementById("ev_date").value,type:document.getElementById("ev_type").value,
+    title:document.getElementById("ev_title").value.trim()||"(未命名)",
+    start:document.getElementById("ev_start").value,end:document.getElementById("ev_end").value,
+    note:document.getElementById("ev_note").value.trim()};
+  if(o.type==="死线"){if(id)S.events=S.events.filter(x=>x.id!==id);S.bosses.push({id:"b"+Date.now(),title:o.title,date:o.date});}
+  else if(id)Object.assign(S.events.find(x=>x.id===id),o);
+  else{o.id="e"+Date.now();S.events.push(o);}save();closeM();render();}
+function delEvent(id){S.events=S.events.filter(x=>x.id!==id);save();closeM();render();}
+function openBoss(id){const b=id?S.bosses.find(x=>x.id===id):null;
+  openM(`<h3>${b?'编辑大决战':'添加大决战'}</h3>
+    <label class="f">名称</label><input id="b_title" value="${b?b.title:''}" placeholder="如：大学院出愿 / 论文截稿">
+    <label class="f">日期</label><input id="b_date" type="date" value="${b?b.date:''}">
+    <div class="foot">${b?`<button onclick="delBoss('${id}')" style="margin-right:auto;color:var(--red2)">删除</button>`:''}
+      <button class="btn-ghost" onclick="closeM()">取消</button>
+      <button class="btn-red" onclick="saveBoss('${id||''}')">保存</button></div>`);}
+function saveBoss(id){const t=document.getElementById("b_title").value.trim(),d=document.getElementById("b_date").value;
+  if(!t||!d)return;if(id)Object.assign(S.bosses.find(x=>x.id===id),{title:t,date:d});
+  else S.bosses.push({id:"b"+Date.now(),title:t,date:d});save();closeM();render();}
+function delBoss(id){S.bosses=S.bosses.filter(x=>x.id!==id);save();closeM();render();}
+function openSettings(){openM(`<h3>编辑习惯战线</h3>
+  <div class="note">每条线：名称 · 最小军令 · 容忍天数（超过即沦陷、连胜归零）。</div>
+  <div style="margin-top:10px">
+    <div class="settingrow"><b style="font-size:11px;color:var(--ink3)">战线</b>
+      <b style="font-size:11px;color:var(--ink3)">最小军令</b><b style="font-size:11px;color:var(--ink3)">容忍</b><span></span></div>
+    ${S.fronts.map((f,i)=>`<div class="settingrow">
+      <input value="${f.name}" oninput="S.fronts[${i}].name=this.value">
+      <input value="${f.order}" oninput="S.fronts[${i}].order=this.value">
+      <input type="number" min="1" value="${f.max}" oninput="S.fronts[${i}].max=+this.value||1">
+      <button onclick="rmFront(${i})" style="color:var(--red2)">✕</button></div>`).join("")}</div>
+  <button class="btn-ghost" onclick="addFront()" style="margin-top:6px">+ 加一条战线</button>
+  <label class="f" style="margin-top:14px">日主天干（十神参照）</label>
+  <select id="set_dm">${GAN.map((g,i)=>`<option value="${i}" ${S.dayMaster===i?'selected':''}>${g}</option>`).join("")}</select>
+  <div class="foot"><button class="btn-ghost" onclick="closeM();render()">完成</button>
+    <button class="btn-red" onclick="S.dayMaster=+document.getElementById('set_dm').value;save();closeM();render()">保存</button></div>`);}
+function addFront(){S.fronts.push({id:"f"+Date.now(),name:"新战线",order:"最小动作",max:3,history:{}});save();openSettings();}
+function rmFront(i){if(confirm("删除该战线？历史一并删除。")){S.fronts.splice(i,1);save();openSettings();}}
+function openCourseEdit(){const dn=["日","一","二","三","四","五","六"];
+  openM(`<h3>课程时段</h3>
+  <div class="note">本学期固定课程。寒暑假用日历页“本学期课程”开关整体关闭，无需逐条删。</div>
+  <div style="margin-top:10px">${S.courses.map((c,i)=>`<div class="settingrow" style="grid-template-columns:60px 1fr 1fr 28px">
+    <select onchange="S.courses[${i}].dow=+this.value">${dn.map((d,j)=>`<option value="${j}" ${c.dow===j?'selected':''}>周${d}</option>`).join("")}</select>
+    <input type="time" value="${c.start}" oninput="S.courses[${i}].start=this.value">
+    <input type="time" value="${c.end}" oninput="S.courses[${i}].end=this.value">
+    <button onclick="rmCourse(${i})" style="color:var(--red2)">✕</button></div>`).join("")}</div>
+  <button class="btn-ghost" onclick="addCourse()" style="margin-top:6px">+ 加一节课</button>
+  <div class="foot"><button class="btn-red" onclick="save();closeM();render()">保存</button></div>`);}
+function addCourse(){S.courses.push({id:"c"+Date.now(),dow:1,start:"09:00",end:"10:30",title:"上课"});save();openCourseEdit();}
+function rmCourse(i){S.courses.splice(i,1);save();openCourseEdit();}
+function toggleCourses(v){S.coursesOn=v;save();renderCal();}
+function settle(){const held=[],fallen=[],alert=[];
+  for(const f of S.fronts){const st=frontStatus(f);
+    if(f.history[todayStr()]||st.txt==="据守"||st.txt==="温")held.push(f.name);
+    else if(st.txt==="已沦陷")fallen.push(f.name+`(${st.c}天)`);
+    else if(st.txt==="告急")alert.push(f.name);}
+  const s=currentStreak();
+  openM(`<h3>今日战报 · ${todayStr()}</h3><div style="font-size:14px;line-height:1.9">
+    <div>连胜：<b style="color:var(--gold);font-size:20px">${s}</b> 天${s===0?' <span style="color:var(--red2)">（已断，有战线沦陷）</span>':''}</div>
+    <div style="margin-top:8px;color:var(--jade)">守住 ${held.length} 条：${held.join("、")||"—"}</div>
+    ${alert.length?`<div style="color:var(--orange)">告急 ${alert.length} 条：${alert.join("、")}</div>`:''}
+    ${fallen.length?`<div style="color:var(--red2)">沦陷 ${fallen.length} 条：${fallen.join("、")}</div>`:''}</div>
+    <div class="note">沦陷的线，明天一个最小动作就能救回。七杀靠的是环境——明天再上场。</div>
+    <div class="foot"><button class="btn-red" onclick="closeM()">收兵</button></div>`);}
+function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="战场战史_"+todayStr()+".json";a.click();}
+function importData(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);if(o.fronts){S=o;save();render();alert("已导入");}}catch(e){alert("文件无法解析");}};
+  r.readAsText(f);}
+
+/* ===================== 启动 ===================== */
+buildDial();render();updateStatus();
+setInterval(tickDial,1000);
+setInterval(renderTop,60000);
+</script>
+</body>
+</html>
