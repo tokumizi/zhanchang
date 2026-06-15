@@ -1,4 +1,4 @@
-const CACHE = "zhanchang-v1";
+const CACHE = "zhanchang-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -10,13 +10,14 @@ self.addEventListener("activate", e => {
       .then(() => self.clients.claim())
   );
 });
+// 网络优先：在线总是拿最新，离线才回退缓存
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+    fetch(e.request).then(resp => {
       const cp = resp.clone();
       caches.open(CACHE).then(c => c.put(e.request, cp));
       return resp;
-    }).catch(() => caches.match("./index.html")))
+    }).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
   );
 });

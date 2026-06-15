@@ -58,12 +58,12 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
   /* ===== 指挥台 ===== */
-  .deck{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
-  @media(max-width:760px){.deck{grid-template-columns:1fr}}
+  .deck{display:grid;grid-template-columns:372px 1fr;gap:18px;align-items:start}
+  @media(max-width:760px){.deck{grid-template-columns:1fr;gap:14px}}
   .dial-card{background:radial-gradient(420px 420px at 50% 38%,#241d17,#191512);
     border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;
     flex-direction:column;align-items:center}
-  .dial-wrap{position:relative;width:300px;height:300px}
+  .dial-wrap{position:relative;width:min(340px,86vw);height:min(340px,86vw)}
   .dial-wrap svg{position:absolute;inset:0}
   #ringRot{transform-origin:150px 150px;animation:spin 240s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -124,6 +124,20 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   .front .acts button{width:100%;font-size:12px;padding:6px}
   .front .done{background:var(--jade);color:#06150f}
   .front.donetoday{border-color:#2e5a45}
+  .front .done{transition:transform .1s} .front .done:active{transform:scale(.94)}
+  .front.flash{animation:flash .6s ease}
+  @keyframes flash{0%{box-shadow:0 0 0 0 rgba(63,163,122,.0)}
+    30%{box-shadow:0 0 0 3px rgba(63,163,122,.55);transform:scale(1.03)}
+    100%{box-shadow:0 0 0 0 rgba(63,163,122,0);transform:none}}
+  .tab{transition:.15s} .modebtn{transition:.15s}
+  #topMarker{filter:drop-shadow(0 0 2px rgba(212,175,55,.5))}
+  @media(max-width:760px){
+    body{padding:14px 12px 80px}
+    .topnav{flex-wrap:wrap;gap:6px} .brand{font-size:18px}
+    .tab{padding:7px 13px;font-size:13px}
+    .deck-right{gap:10px} .pillar{width:54px} .pillar .gz{font-size:22px}
+    .fronts{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  }
 
   /* ===== 日历 ===== */
   .calhead{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
@@ -372,7 +386,7 @@ function dayHeld(onStr){let any=false;for(const f of S.fronts){const lt=lastTouc
   if(!lt)continue;any=true;if(coldDays(f,onStr)>f.max)return false;}return any;}
 function currentStreak(){let n=0,d=new Date();for(let i=0;i<400;i++){
   if(dayHeld(fmt(d)))n++;else break;d.setDate(d.getDate()-1);}return n;}
-function touch(id){const f=S.fronts.find(x=>x.id===id);f.history[todayStr()]=true;save();render();}
+function touch(id){const f=S.fronts.find(x=>x.id===id);f.history[todayStr()]=true;window._flash=id;if(navigator.vibrate)navigator.vibrate(30);save();render();}
 function untouch(id){const f=S.fronts.find(x=>x.id===id);delete f.history[todayStr()];save();render();}
 
 /* ===================== 日晷 / 罗盘 ===================== */
@@ -408,7 +422,9 @@ function solarAzimuth(lat,lon,date){const r=Math.PI/180;
   const sinEl=Math.sin(lat*r)*Math.sin(dec*r)+Math.cos(lat*r)*Math.cos(dec*r)*Math.cos(H*r);
   const el=Math.asin(sinEl)/r;
   let az=Math.acos(Math.max(-1,Math.min(1,(Math.sin(dec*r)-Math.sin(lat*r)*sinEl)/(Math.cos(lat*r)*Math.cos(el*r)))))/r;
-  if(Math.sin(H*r)>0)az=360-az; return {az:((az%360)+360)%360,el};}
+  if(Math.sin(H*r)>0)az=360-az;
+  const tst=(((12+H/15)%24)+24)%24; // 真太阳时（小时）
+  return {az:((az%360)+360)%360,el,tst};}
 
 function buildDial(){
   const cx=190,cy=190;let d="";
@@ -420,23 +436,26 @@ function buildDial(){
   // 二十四山
   for(const m of SHAN){const deg=az2svg(m[2]),[tx,ty]=P(cx,cy,168,deg);
     const col=m[1]==="维"?"#caa24b":m[1]==="干"?"#9a8b76":"#7c7164";
-    d+=`<text x="${tx}" y="${ty+3.5}" text-anchor="middle" font-family="Songti SC,serif" font-size="10" fill="${col}">${m[0]}</text>`;
+    d+=`<text class="dlbl" x="${tx}" y="${ty+3.5}" text-anchor="middle" font-family="Songti SC,serif" font-size="10" fill="${col}">${m[0]}</text>`;
     const[a1,b1]=P(cx,cy,160,deg),[a2,b2]=P(cx,cy,176,deg);
     d+=`<line x1="${a1}" y1="${b1}" x2="${a2}" y2="${b2}" stroke="#4a3f35" stroke-width="0.5"/>`;}
   // 八卦符号+名
   for(const b of BG){const deg=az2svg(b[3]),c=WX[b[2]],[sx,sy]=P(cx,cy,130,deg),[gx,gy]=P(cx,cy,146,deg);
-    d+=`<text x="${sx}" y="${sy+2}" text-anchor="middle" font-size="18" fill="${c}">${b[1]}</text>`;
-    d+=`<text x="${gx}" y="${gy+3}" text-anchor="middle" font-family="Songti SC,serif" font-size="8.5" fill="${c}" opacity="0.8">${b[0]}</text>`;}
+    d+=`<text class="dlbl" x="${sx}" y="${sy+2}" text-anchor="middle" font-size="18" fill="${c}">${b[1]}</text>`;
+    d+=`<text class="dlbl" x="${gx}" y="${gy+3}" text-anchor="middle" font-family="Songti SC,serif" font-size="8.5" fill="${c}" opacity="0.8">${b[0]}</text>`;}
   // 十二地支/时辰
-  for(let i=0;i<12;i++){const deg=az2svg(i*30),[x,y]=P(cx,cy,90,deg),hot=(i===6||i===0);
-    d+=`<text x="${x}" y="${y+8}" text-anchor="middle" font-family="Songti SC,serif" font-size="22" fill="${hot?'#d4af37':'#e9e2d6'}">${ZHI[i]}</text>`;}
+  for(let i=0;i<12;i++){const deg=az2svg(i*30),[x,y]=P(cx,cy,84,deg),hot=(i===6||i===0);
+    d+=`<text class="dlbl" x="${x}" y="${y+7}" text-anchor="middle" font-family="Songti SC,serif" font-size="20" fill="${hot?'#d4af37':'#e9e2d6'}">${ZHI[i]}</text>`;}
   // 旋转盘 + 动态层
   const svg=`<g id="diskRot">${d}</g>`+
-    `<line id="shadow" x1="190" y1="190" x2="190" y2="60" stroke="#c0392b" stroke-width="2.6" stroke-linecap="round"/>`+
+    `<line id="shadow" x1="190" y1="190" x2="190" y2="60" stroke="#c0392b" stroke-width="3" stroke-linecap="round"/>`+
     `<line id="tail" x1="190" y1="190" x2="190" y2="250" stroke="#6b5a4d" stroke-width="2" stroke-linecap="round"/>`+
-    `<circle id="sun2" r="13" fill="#d4af37" fill-opacity="0.25"/><circle id="sun" r="7" fill="#d4af37"/>`+
+    `<circle id="sun3" r="22" fill="#d4af37" fill-opacity="0.12"/>`+
+    `<circle id="sun2" r="15" fill="#d4af37" fill-opacity="0.22"/><circle id="sun" r="8" fill="#f0c850"/>`+
+    `<text id="northLab" text-anchor="middle" font-family="Songti SC,serif" font-size="13" font-weight="bold" fill="#e05a48" style="display:none">北</text>`+
     `<circle id="sec" r="2.4" fill="#e9e2d6"/>`+
-    `<circle cx="190" cy="190" r="5" fill="#1d1916" stroke="#5a4d42" stroke-width="1.5"/>`;
+    `<circle cx="190" cy="190" r="5" fill="#1d1916" stroke="#5a4d42" stroke-width="1.5"/>`+
+    `<path id="topMarker" d="M190 7 L183 18 L197 18 Z" fill="#d4af37"/>`;
   document.getElementById("dialSvg").innerHTML=svg;
 }
 function tickDial(){
@@ -451,10 +470,13 @@ function tickDial(){
     const sol=solarAzimuth(GEO.lat,GEO.lon,now);
     sunDeg=270+sol.az-HEADING; needleDeg=270-HEADING;
     const faceAz=((HEADING%360)+360)%360,info=azInfo(faceAz);
+    const th=Math.floor(sol.tst),tm=Math.round((sol.tst-th)*60);
+    const tstStr=`${String(th).padStart(2,"0")}:${String(tm%60).padStart(2,"0")}`;
     document.getElementById("dialSz").textContent="面朝";
     document.getElementById("dialGz").innerHTML=`<span class="g">${info.shan}</span>`;
     document.getElementById("dialNow").textContent=`${Math.round(faceAz)}° · ${info.dir}`;
     document.getElementById("dialDir").innerHTML=`${info.gua}卦 · ${info.wx}　<span style="color:var(--ink3)">${hP.gz}时</span>`;
+    document.getElementById("dialStatus").innerHTML=`真北已锁 · 太阳 方位 ${Math.round(sol.az)}° 高度 ${Math.round(sol.el)}° · 真太阳时 ${tstStr}`;
     sec.style.display="none";
   }else{
     const hf=h+mi/60+se/3600;
@@ -469,9 +491,19 @@ function tickDial(){
     document.getElementById("dialDir").innerHTML=`${info.dir} · ${info.gua} · ${info.wx}`;
   }
   disk.setAttribute("transform",`rotate(${R} 190 190)`);
-  const[sx,sy]=P(cx,cy,160,sunDeg);sun.setAttribute("cx",sx);sun.setAttribute("cy",sy);sun2.setAttribute("cx",sx);sun2.setAttribute("cy",sy);
+  // 盘转动时，每个字反向自转，始终保持正向好读
+  const labels=disk.querySelectorAll(".dlbl");
+  if(R){labels.forEach(t=>t.setAttribute("transform",`rotate(${(-R).toFixed(1)} ${t.getAttribute("x")} ${t.getAttribute("y")})`));}
+  else{labels.forEach(t=>{if(t.hasAttribute("transform"))t.removeAttribute("transform");});}
+  const[sx,sy]=P(cx,cy,160,sunDeg);const sun3=document.getElementById("sun3");
+  sun.setAttribute("cx",sx);sun.setAttribute("cy",sy);sun2.setAttribute("cx",sx);sun2.setAttribute("cy",sy);
+  sun3.setAttribute("cx",sx);sun3.setAttribute("cy",sy);
   const[ex,ey]=P(cx,cy,150,needleDeg);sh.setAttribute("x2",ex);sh.setAttribute("y2",ey);
   const[tx,ty]=P(cx,cy,70,needleDeg+180);tail.setAttribute("x2",tx);tail.setAttribute("y2",ty);
+  const northLab=document.getElementById("northLab");
+  if(MODE==="compass"&&HEADING!=null){const[nx,ny]=P(cx,cy,136,needleDeg);
+    northLab.setAttribute("x",nx);northLab.setAttribute("y",ny+4);northLab.style.display="";}
+  else northLab.style.display="none";
 }
 function setMode(m){
   if(m==="compass")enableCompass();
@@ -483,7 +515,8 @@ function setMode(m){
 function updateStatus(){const s=document.getElementById("dialStatus");if(!s)return;
   if(MODE==="clock"){s.innerHTML="时钟模式 · 南上固定 · 太阳走时辰";return;}
   if(HEADING==null)s.innerHTML='<span style="color:var(--orange)">罗盘待启…需手机并允许「方向」权限（电脑无指南针硬件）</span>';
-  else s.innerHTML=`罗盘模式 · 真北已锁 · ${GEO.name||GEO.lat.toFixed(2)+'°,'+GEO.lon.toFixed(2)+'°'} 太阳真位`;}
+  // HEADING 有值时，状态行由 tickDial 写实时太阳数据，这里不覆盖
+  }
 function enableCompass(){
   if(navigator.geolocation)navigator.geolocation.getCurrentPosition(
     p=>{GEO={lat:p.coords.latitude,lon:p.coords.longitude,name:""};updateStatus();},()=>{},{timeout:8000});
@@ -496,7 +529,7 @@ function enableCompass(){
 function onOrient(e){let hd=null;
   if(e.webkitCompassHeading!=null)hd=e.webkitCompassHeading;
   else if(e.absolute&&e.alpha!=null)hd=(360-e.alpha)%360;
-  if(hd!=null){HEADING=hd;if(MODE==="compass"){tickDial();updateStatus();}}}
+  if(hd!=null){HEADING=hd;if(MODE==="compass")tickDial();}}
 
 /* ===================== 渲染 ===================== */
 function render(){renderTop();renderBanner();renderFronts();renderMini();renderBosses();renderCal();renderNote();
@@ -540,15 +573,20 @@ function renderMini(){
   document.getElementById("tabBadge").style.display=(alert+fallen)?"inline-block":"none";
 }
 function renderFronts(){
-  document.getElementById("fronts").innerHTML=S.fronts.map(f=>{
-    const st=frontStatus(f),done=!!f.history[todayStr()],dtxt=st.c===Infinity?'∞':st.c,cls=st.cls;
-    return `<div class="front ${cls} ${done?'donetoday':''}"><div class="bar"></div>
+  // 按危险度排序：未完成在前，越久没碰越靠前；今日已据守沉底
+  const arr=S.fronts.map(f=>({f,st:frontStatus(f),done:!!f.history[todayStr()]}));
+  arr.sort((a,b)=>{ if(a.done!==b.done) return a.done?1:-1;
+    const av=a.st.c===Infinity?99999:a.st.c, bv=b.st.c===Infinity?99999:b.st.c; return bv-av; });
+  document.getElementById("fronts").innerHTML=arr.map(({f,st,done})=>{
+    const dtxt=st.c===Infinity?'∞':st.c,cls=st.cls,flash=(window._flash===f.id)?' flash':'';
+    return `<div class="front ${cls} ${done?'donetoday':''}${flash}"><div class="bar"></div>
       <div class="nm">${f.name}</div><div class="order">军令：${f.order}</div>
       <div class="stat"><span class="d">${done?'✓':dtxt}</span>
         ${done?' 今日已据守':` 天没碰 · <span class="muted">${st.txt}</span>`}</div>
       <div class="acts">${done?`<button onclick="untouch('${f.id}')">撤销</button>`
         :`<button class="done" onclick="touch('${f.id}')">出击 ✓</button>`}</div></div>`;
   }).join("");
+  window._flash=null;
 }
 function renderBosses(){
   const today=parseD(todayStr()),arr=[...S.bosses].sort((a,b)=>a.date.localeCompare(b.date));
@@ -595,7 +633,11 @@ const scrim=document.getElementById("scrim"),modal=document.getElementById("moda
 scrim.onclick=e=>{if(e.target===scrim)closeM();};
 function closeM(){scrim.classList.remove("on");modal.innerHTML="";}
 function openM(html){modal.innerHTML=html;scrim.classList.add("on");}
+function evFill(s,en){document.getElementById('ev_start').value=s;document.getElementById('ev_end').value=en;
+  const t=document.getElementById('ev_type');if(t)t.value='打工';
+  const ti=document.getElementById('ev_title');if(ti&&!ti.value)ti.value='打工';}
 function openEvent(id,dateStr){const e=id?S.events.find(x=>x.id===id):null,d=e?e.date:(dateStr||todayStr());
+  const lw=S.lastWork||{},sv=e?(e.start||''):(lw.start||''),evv=e?(e.end||''):(lw.end||'');
   openM(`<h3>${e?'编辑事件':'添加事件'}</h3>
     <label class="f">日期</label><input id="ev_date" type="date" value="${d}">
     <label class="f">类型</label><select id="ev_type">
@@ -603,8 +645,13 @@ function openEvent(id,dateStr){const e=id?S.events.find(x=>x.id===id):null,d=e?e
       <option value="突发" ${e&&e.type==='突发'?'selected':''}>突发事件</option>
       <option value="死线" ${e&&e.type==='死线'?'selected':''}>死线 / 截止</option></select>
     <label class="f">标题</label><input id="ev_title" value="${e?e.title:''}" placeholder="如：便利店班 / 见导师">
-    <div class="mrow"><div><label class="f">开始</label><input id="ev_start" type="time" value="${e?e.start||'':''}"></div>
-      <div><label class="f">结束</label><input id="ev_end" type="time" value="${e?e.end||'':''}"></div></div>
+    <div class="mrow"><div><label class="f">开始</label><input id="ev_start" type="time" value="${sv}"></div>
+      <div><label class="f">结束</label><input id="ev_end" type="time" value="${evv}"></div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      ${lw.start?`<button class="btn-ghost" onclick="evFill('${lw.start}','${lw.end||''}')">上次 ${lw.start}–${lw.end||''}</button>`:''}
+      <button class="btn-ghost" onclick="evFill('09:00','13:00')">09–13</button>
+      <button class="btn-ghost" onclick="evFill('13:00','17:00')">13–17</button>
+      <button class="btn-ghost" onclick="evFill('17:00','22:00')">17–22</button></div>
     <label class="f">备注</label><textarea id="ev_note">${e?e.note||'':''}</textarea>
     <div class="foot">${e?`<button onclick="delEvent('${id}')" style="margin-right:auto;color:var(--red2)">删除</button>`:''}
       <button class="btn-ghost" onclick="closeM()">取消</button>
@@ -618,6 +665,7 @@ function saveEvent(id){const o={date:document.getElementById("ev_date").value,ty
     title:document.getElementById("ev_title").value.trim()||"(未命名)",
     start:document.getElementById("ev_start").value,end:document.getElementById("ev_end").value,
     note:document.getElementById("ev_note").value.trim()};
+  if(o.type==="打工"&&o.start)S.lastWork={start:o.start,end:o.end};
   if(o.type==="死线"){if(id)S.events=S.events.filter(x=>x.id!==id);S.bosses.push({id:"b"+Date.now(),title:o.title,date:o.date});}
   else if(id)Object.assign(S.events.find(x=>x.id===id),o);
   else{o.id="e"+Date.now();S.events.push(o);}save();closeM();render();}
