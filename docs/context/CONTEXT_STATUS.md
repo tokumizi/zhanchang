@@ -1,6 +1,6 @@
 # Context 状态监控
 
-> 最后更新：2026-06-15 10:22:38
+> 最后更新：2026-06-15 17:37:05
 
 ## 当前估算
 
@@ -8,10 +8,10 @@
 |------|------|
 | session_id | `7f6345e8-945b-4ee7-9ccc-184da6958bd0` |
 | transcript_path | `/Users/wangziyi/.claude/projects/-Users-wangziyi-ink-animation/7f6345e8-945b-4ee7-9ccc-184da6958bd0.jsonl` |
-| JSONL 文件大小 | 4719.2 KB |
-| 估算 Token 数 | 230,115 |
+| JSONL 文件大小 | 9066.7 KB |
+| 估算 Token 数 | 442,109 |
 | 上限（估算） | 200,000 |
-| 使用百分比 | **115.1%** |
+| 使用百分比 | **221.1%** |
 | 风险等级 | 🔴 URGENT（>95%） |
 
 ## 建议操作
