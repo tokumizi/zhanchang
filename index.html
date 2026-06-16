@@ -6,7 +6,7 @@
 <title>战场 · 每日指挥台</title>
 <meta name="theme-color" content="#14110f">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="战场">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-180.png">
@@ -27,13 +27,16 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:radial-gradient(1200px 700px at 70% -10%,#2a221c 0%,var(--bg) 60%);
-    color:var(--ink);font-family:var(--sans);min-height:100vh;padding:18px 18px 90px;
+    color:var(--ink);font-family:var(--sans);min-height:100vh;
+    padding:calc(18px + env(safe-area-inset-top)) 18px calc(90px + env(safe-area-inset-bottom));
     -webkit-font-smoothing:antialiased}
   .wrap{max-width:1180px;margin:0 auto}
   h1,h2,h3{font-weight:600}
   .muted{color:var(--ink3)}
   button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;color:var(--ink);
-    background:var(--panel2);padding:7px 12px;font-size:13px;transition:.15s}
+    background:var(--panel2);padding:7px 12px;font-size:13px;transition:.15s;
+    touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.08);
+    -webkit-user-select:none;user-select:none}
   button:hover{background:#2e2620}
   .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red2)}
   .btn-ghost{background:transparent;border:1px solid var(--line)}
@@ -43,7 +46,10 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
     background:linear-gradient(90deg,transparent,rgba(212,175,55,.22),transparent)}
 
   /* ===== 顶部 Tab 导航 ===== */
-  .topnav{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+  .topnav{display:flex;align-items:center;gap:8px;margin-bottom:18px;
+    position:sticky;top:0;z-index:30;padding:8px 0;
+    background:linear-gradient(180deg,var(--bg) 70%,transparent)}
+  .tab{position:relative;z-index:1}
   .brand{font-family:var(--serif);font-size:20px;letter-spacing:.18em;margin-right:8px}
   .brand .dot{color:var(--red2)}
   .tabs{display:flex;gap:4px;background:linear-gradient(180deg,#1f1a16,#191512);border:1px solid #352d26;
@@ -160,7 +166,7 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   .tab{transition:.15s} .modebtn{transition:.15s}
   #topMarker{filter:drop-shadow(0 0 2px rgba(212,175,55,.5))}
   @media(max-width:760px){
-    body{padding:14px 12px 80px}
+    body{padding:calc(10px + env(safe-area-inset-top)) 12px calc(80px + env(safe-area-inset-bottom))}
     .topnav{flex-wrap:wrap;gap:6px} .brand{font-size:18px}
     .tab{padding:7px 13px;font-size:13px}
     .deck-right{gap:10px} .pillar{width:54px} .pillar .gz{font-size:22px}
