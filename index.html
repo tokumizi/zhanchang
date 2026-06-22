@@ -210,6 +210,11 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   .cell.today{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .cell .dn{font-size:14px;font-weight:600}
   .cell .gz{font-family:var(--serif);font-size:12px;color:var(--ink3);float:right}
+  .cell .term{display:inline-block;font-family:var(--serif);font-size:10px;font-weight:600;
+    color:#1a1407;background:linear-gradient(180deg,#e3ca6e,#c9a83f);border-radius:4px;
+    padding:1px 5px;margin:3px 0 1px}
+  .termbar{font-size:12px;color:var(--ink2);margin-top:10px;text-align:center}
+  .termbar b{color:var(--gold);font-family:var(--serif)}
   .cell .ev{font-size:10.5px;margin-top:3px;padding:1px 4px;border-radius:4px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ev.k课程{background:#22303a;color:#9fd0e6}.ev.k打工{background:#2a2433;color:#c4a7e6}
@@ -254,12 +259,10 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
     <div class="brand">战<span class="dot">·</span>场</div>
     <div class="tabs">
       <button class="tab act" data-v="home" onclick="showView('home')">指挥台</button>
-      <button class="tab" data-v="fronts" onclick="showView('fronts')">战线 <span class="badge" id="tabBadge">0</span></button>
       <button class="tab" data-v="cal" onclick="showView('cal')">日历</button>
       <button class="tab" data-v="liuyao" onclick="showView('liuyao')">六爻</button>
     </div>
     <div class="grow"></div>
-    <button class="btn-ghost" onclick="settle()">结算</button>
   </div>
 
   <!-- 指挥台 -->
@@ -288,39 +291,14 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
           <div class="ten" id="envTen"></div>
           <div class="advice" id="envAdvice"></div>
         </div>
-        <div class="banner">
-          <div class="streak" id="streakBox">
-            <div class="n" id="streakN">0</div>
-            <div class="t">连胜<br>无沦陷</div>
-          </div>
-          <div class="orders">
-            <div class="h">今 日 军 令</div>
-            <div class="body" id="orders"></div>
-          </div>
-        </div>
         <div class="mini">
           <div class="row">
-            <div class="stat" id="miniStat"></div>
             <div class="grow"></div>
-            <button class="btn-ghost" onclick="showView('fronts')">进入战线 ›</button>
             <button class="btn-ghost" onclick="showView('cal')">看日历 ›</button>
+            <button class="btn-ghost" onclick="showView('liuyao')">起一卦 ›</button>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- 战线 -->
-  <div class="view" id="view-fronts">
-    <div class="sectitle"><h2>习惯战线</h2><div class="line"></div>
-      <button class="btn-ghost" onclick="openSettings()">编辑战线</button>
-      <button class="btn-ghost" onclick="settle()">今日结算</button>
-    </div>
-    <div class="fronts" id="fronts"></div>
-    <div class="toolbar">
-      <button class="btn-ghost" onclick="exportData()">导出战史</button>
-      <button class="btn-ghost" onclick="document.getElementById('importer').click()">导入</button>
-      <input type="file" id="importer" accept=".json" style="display:none" onchange="importData(event)">
     </div>
   </div>
 
@@ -344,14 +322,20 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
       </div>
       <div class="cal" id="cal"></div>
       <div class="legend">
+        <span><i style="background:linear-gradient(180deg,#e0c66a,#c9a83f)"></i>节气</span>
         <span><i style="background:#3b5563"></i>课程</span>
         <span><i style="background:#5a4570"></i>打工</span>
         <span><i style="background:#6e3a30"></i>突发</span>
         <span><i style="background:#6e2f50"></i>死线/大决战</span>
-        <span class="muted">· 点任意日期可加事件</span>
       </div>
+      <div class="termbar" id="termInfo"></div>
     </div>
     <div class="note" id="gzNote"></div>
+    <div class="toolbar">
+      <button class="btn-ghost" onclick="exportData()">导出数据</button>
+      <button class="btn-ghost" onclick="document.getElementById('importer').click()">导入</button>
+      <input type="file" id="importer" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
   </div>
 
   <!-- 六爻 -->
@@ -609,7 +593,7 @@ function onOrient(e){let hd=null;
   if(hd!=null){HEADING=hd;if(MODE==="compass")tickDial();}}
 
 /* ===================== 渲染 ===================== */
-function render(){renderTop();renderBanner();renderFronts();renderMini();renderBosses();renderCal();renderNote();
+function render(){renderTop();renderBosses();renderCal();renderNote();
   document.getElementById("courseToggle").checked=S.coursesOn;tickDial();}
 function renderTop(){
   const now=new Date(),eff=effectiveDayDate(now);
@@ -688,6 +672,21 @@ function renderBosses(){
 }
 
 /* ===================== 日历 ===================== */
+const TERMNAME=["小寒","大寒","立春","雨水","惊蛰","春分","清明","谷雨","立夏","小满","芒种","夏至",
+  "小暑","大暑","立秋","处暑","白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至"];
+function termOnDate(d){const y=d.getFullYear();
+  for(let i=0;i<24;i++){const t=termDate(y,i);
+    if(t.getMonth()===d.getMonth()&&t.getDate()===d.getDate())return TERMNAME[i];}
+  return null;}
+// 当前所处节气 + 下一个节气倒计时
+function termInfo(date){
+  let prev=null,next=null;
+  for(const yr of [date.getFullYear()-1,date.getFullYear(),date.getFullYear()+1]){
+    for(let i=0;i<24;i++){const t=termDate(yr,i);
+      if(t<=date&&(!prev||t>prev.t))prev={t,name:TERMNAME[i]};
+      if(t>date&&(!next||t<next.t))next={t,name:TERMNAME[i]};}}
+  const days=next?Math.ceil((next.t-date)/86400000):0;
+  return {cur:prev?prev.name:"",next:next?next.name:"",days};}
 function eventsOn(dStr){const out=[],dow=parseD(dStr).getDay();
   if(S.coursesOn)for(const c of S.courses)if(c.dow===dow)out.push({type:"课程",title:c.title,start:c.start});
   for(const e of S.events)if(e.date===dStr)out.push(e);
@@ -700,11 +699,15 @@ function renderCal(){
   let html=dows.map(d=>`<div class="dow">${d}</div>`).join("");
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);
     const ds=fmt(d),out=d.getMonth()!==m,dp=dayPillarForCivil(d),evs=eventsOn(ds);
+    const term=termOnDate(d),termHtml=term?`<div class="term">${term}</div>`:'';
     const evHtml=evs.slice(0,3).map(e=>`<div class="ev k${e.type}">${e.start?e.start+' ':''}${e.title}</div>`).join("")
       +(evs.length>3?`<div class="ev muted">+${evs.length-3}</div>`:"");
     html+=`<div class="cell ${out?'out':''} ${ds===todayStr()?'today':''}" onclick="openEvent(null,'${ds}')">
-      <span class="gz">${dp.gz}</span><div class="dn">${d.getDate()}</div>${evHtml}</div>`;}
+      <span class="gz">${dp.gz}</span><div class="dn">${d.getDate()}</div>${termHtml}${evHtml}</div>`;}
   document.getElementById("cal").innerHTML=html;
+  const ti=termInfo(new Date());
+  document.getElementById("termInfo").innerHTML=
+    `当前节气 <b>${ti.cur}</b>　距 <b>${ti.next}</b> 还有 <b>${ti.days}</b> 天`;
 }
 function moveMonth(n){calCursor.setMonth(calCursor.getMonth()+n);renderCal();}
 function gotoToday(){calCursor=new Date();calCursor.setDate(1);renderCal();}
