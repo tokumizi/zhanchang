@@ -128,6 +128,32 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   .sectitle h2::before{content:"◆";color:var(--gold);font-size:8px;margin-right:9px;vertical-align:2.5px}
   .sectitle .line{flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,.22),var(--line) 38%,transparent)}
 
+  /* ===== 六爻 ===== */
+  #ly_q{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);padding:10px 12px;font-size:14px;font-family:inherit}
+  .ly-actions{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+  .ly-meta{font-size:13px;color:var(--ink2);line-height:1.9;margin-bottom:12px;
+    padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .ly-meta b{color:var(--gold);font-family:var(--serif)}
+  .ly-meta .gn{font-family:var(--serif);font-size:18px;color:var(--ink)}
+  .ly-table{width:100%;border-collapse:collapse;font-size:13px}
+  .ly-table td{padding:9px 5px;border-bottom:1px solid #2b251f;vertical-align:middle;white-space:nowrap}
+  .ly-table .hd td{color:var(--ink3);font-size:11px;letter-spacing:.05em;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .ly-sx{color:var(--ink3);font-size:12px;text-align:center;width:30px}
+  .ly-liu{font-family:var(--serif);font-size:15px}
+  .ly-gz{font-family:var(--serif);color:var(--ink2)}
+  .ly-gz .w{font-size:11px;color:var(--ink3)}
+  .ly-kong{color:var(--amber);font-size:11px;margin-left:3px}
+  .ly-yao{width:64px;text-align:center}
+  .bar{display:inline-block;height:9px;background:#cdbf9e;border-radius:1px;vertical-align:middle}
+  .bar.full{width:50px}.bar.half{width:21px}.bar.half + .bar.half{margin-left:8px}
+  .bar.mv{background:var(--red2);box-shadow:0 0 6px rgba(224,90,72,.5)}
+  .ly-move{color:var(--red2);font-weight:600;text-align:center;width:22px}
+  .ly-sy{text-align:center;width:26px}
+  .ly-shi{color:var(--gold);font-weight:700}.ly-ying{color:var(--jade);font-weight:700}
+  .ly-bian{color:var(--ink3);font-family:var(--serif);text-align:right}
+  .ly-bian b{color:var(--red2);font-weight:400}
+
   /* ===== 战线卡片 ===== */
   .fronts{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
   .front{position:relative;border-radius:18px;padding:16px 16px 14px;overflow:hidden;
@@ -230,6 +256,7 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
       <button class="tab act" data-v="home" onclick="showView('home')">指挥台</button>
       <button class="tab" data-v="fronts" onclick="showView('fronts')">战线 <span class="badge" id="tabBadge">0</span></button>
       <button class="tab" data-v="cal" onclick="showView('cal')">日历</button>
+      <button class="tab" data-v="liuyao" onclick="showView('liuyao')">六爻</button>
     </div>
     <div class="grow"></div>
     <button class="btn-ghost" onclick="settle()">结算</button>
@@ -325,6 +352,22 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
       </div>
     </div>
     <div class="note" id="gzNote"></div>
+  </div>
+
+  <!-- 六爻 -->
+  <div class="view" id="view-liuyao">
+    <div class="sectitle"><h2>六爻 · 排盘</h2><div class="line"></div></div>
+    <div class="card">
+      <input id="ly_q" placeholder="所问何事（可留空）">
+      <div class="ly-actions">
+        <button class="btn-red" onclick="castGua()">摇 卦</button>
+        <button class="btn-ghost" onclick="manualGua()">手动布爻</button>
+        <button class="btn-ghost" onclick="clearGua()">重置</button>
+      </div>
+      <div id="ly_meta" class="ly-meta"></div>
+      <div id="ly_pan" class="ly-pan"></div>
+      <div class="note">纳甲·世应·六亲按京房法，六神按当日日干，旬空按日干支推算。卦象自下（初爻）向上排。断卦请自行参详。</div>
+    </div>
   </div>
 </div>
 
@@ -672,7 +715,9 @@ function renderNote(){document.getElementById("gzNote").innerHTML=
 function showView(v){
   document.querySelectorAll(".view").forEach(e=>e.classList.toggle("on",e.id==="view-"+v));
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("act",t.dataset.v===v));
-  if(v==="cal")renderCal();window.scrollTo(0,0);
+  if(v==="cal")renderCal();
+  if(v==="liuyao")renderLiuyao();
+  window.scrollTo(0,0);
 }
 
 /* ===================== 弹窗 ===================== */
@@ -778,6 +823,93 @@ function importData(ev){const f=ev.target.files[0];if(!f)return;const r=new File
   r.readAsText(f);}
 
 /* ===================== 启动 ===================== */
+/* ===================== 六爻 排盘 ===================== */
+const ZWX=[4,2,0,0,2,1,1,2,3,3,2,4];      // 地支五行 子..亥（木0火1土2金3水4）
+const WXNAME=["木","火","土","金","水"], WXIDX={"木":0,"火":1,"土":2,"金":3,"水":4};
+const TRIG={
+ "111":{n:"乾",wx:"金",gi:"甲",go:"壬",zi:["子","寅","辰"],zo:["午","申","戌"]},
+ "110":{n:"兑",wx:"金",gi:"丁",go:"丁",zi:["巳","卯","丑"],zo:["亥","酉","未"]},
+ "101":{n:"离",wx:"火",gi:"己",go:"己",zi:["卯","丑","亥"],zo:["酉","未","巳"]},
+ "100":{n:"震",wx:"木",gi:"庚",go:"庚",zi:["子","寅","辰"],zo:["午","申","戌"]},
+ "011":{n:"巽",wx:"木",gi:"辛",go:"辛",zi:["丑","亥","酉"],zo:["未","巳","卯"]},
+ "010":{n:"坎",wx:"水",gi:"戊",go:"戊",zi:["寅","辰","午"],zo:["申","戌","子"]},
+ "001":{n:"艮",wx:"土",gi:"丙",go:"丙",zi:["辰","午","申"],zo:["戌","子","寅"]},
+ "000":{n:"坤",wx:"土",gi:"乙",go:"癸",zi:["未","巳","卯"],zo:["丑","亥","酉"]}};
+const GNAME={
+ "乾":{"乾":"乾为天","兑":"天泽履","离":"天火同人","震":"天雷无妄","巽":"天风姤","坎":"天水讼","艮":"天山遁","坤":"天地否"},
+ "兑":{"乾":"泽天夬","兑":"兑为泽","离":"泽火革","震":"泽雷随","巽":"泽风大过","坎":"泽水困","艮":"泽山咸","坤":"泽地萃"},
+ "离":{"乾":"火天大有","兑":"火泽睽","离":"离为火","震":"火雷噬嗑","巽":"火风鼎","坎":"火水未济","艮":"火山旅","坤":"火地晋"},
+ "震":{"乾":"雷天大壮","兑":"雷泽归妹","离":"雷火丰","震":"震为雷","巽":"雷风恒","坎":"雷水解","艮":"雷山小过","坤":"雷地豫"},
+ "巽":{"乾":"风天小畜","兑":"风泽中孚","离":"风火家人","震":"风雷益","巽":"巽为风","坎":"风水涣","艮":"风山渐","坤":"风地观"},
+ "坎":{"乾":"水天需","兑":"水泽节","离":"水火既济","震":"水雷屯","巽":"水风井","坎":"坎为水","艮":"水山蹇","坤":"水地比"},
+ "艮":{"乾":"山天大畜","兑":"山泽损","离":"山火贲","震":"山雷颐","巽":"山风蛊","坎":"山水蒙","艮":"艮为山","坤":"山地剥"},
+ "坤":{"乾":"地天泰","兑":"地泽临","离":"地火明夷","震":"地雷复","巽":"地风升","坎":"地水师","艮":"地山谦","坤":"坤为地"}};
+const SX6=["青龙","朱雀","勾陈","螣蛇","白虎","玄武"];
+const PMAP=(()=>{const map={},palaces=["111","110","101","100","011","010","001","000"];
+  const flips=[[],[0],[1],[2],[3],[4],[3],[0,1,2]],shi=[6,1,2,3,4,5,4,3];
+  for(const p of palaces){let L=(p+p).split("").map(Number);
+    for(let s=0;s<8;s++){for(const i of flips[s])L[i]^=1;
+      map[L.join("")]={palace:TRIG[p].n,wx:TRIG[p].wx,shi:shi[s]};}}
+  return map;})();
+function liuqin(pwx,zhi){const me=WXIDX[pwx],y=ZWX[ZHI.indexOf(zhi)];
+  if(me===y)return"兄弟"; if((y+1)%5===me)return"父母"; if((me+1)%5===y)return"子孙";
+  if((y+2)%5===me)return"官鬼"; if((me+2)%5===y)return"妻财"; return"—";}
+function naJia(key){const lo=TRIG[key.slice(0,3)],up=TRIG[key.slice(3,6)],o=[];
+  for(let i=0;i<3;i++)o.push({gan:lo.gi,zhi:lo.zi[i]});
+  for(let i=0;i<3;i++)o.push({gan:up.go,zhi:up.zo[i]}); return o;}
+function guaName(key){return GNAME[TRIG[key.slice(3,6)].n][TRIG[key.slice(0,3)].n];}
+function tossLine(){let b=0;for(let i=0;i<3;i++)if(Math.random()<0.5)b++;
+  return b===3?{yang:1,moving:1}:b===0?{yang:0,moving:1}:b===1?{yang:1,moving:0}:{yang:0,moving:0};}
+
+let GUA = (S.lastGua||null);
+function castGua(){const lines=[];for(let i=0;i<6;i++)lines.push(tossLine());
+  GUA={q:document.getElementById("ly_q").value.trim(),lines,at:Date.now()};
+  S.lastGua=GUA;save();renderLiuyao();}
+function clearGua(){GUA=null;S.lastGua=null;save();document.getElementById("ly_q").value="";renderLiuyao();}
+function manualGua(){const opt=v=>`<option value="${v}">${["老阴 × (动)","少阳 ⚊","少阴 ⚋","老阳 ○ (动)"][v]}</option>`;
+  let rows="";for(let i=5;i>=0;i--){const nm=["初","二","三","四","五","上"][i];
+    rows+=`<label class="f">${nm}爻</label><select id="mg_${i}">${[1,2,3,0].map(opt).join("")}</select>`;}
+  openM(`<h3>手动布爻</h3><div class="note">从上爻到初爻依次选定。⚊少阳 ⚋少阴 ○老阳动 ×老阴动。</div>
+    ${rows}<div class="foot"><button class="btn-ghost" onclick="closeM()">取消</button>
+    <button class="btn-red" onclick="saveManual()">布卦</button></div>`);}
+function saveManual(){const lines=[];for(let i=0;i<6;i++){const v=+document.getElementById("mg_"+i).value;
+  lines.push(v===3?{yang:1,moving:1}:v===0?{yang:0,moving:1}:v===1?{yang:1,moving:0}:{yang:0,moving:0});}
+  GUA={q:document.getElementById("ly_q").value.trim(),lines,at:Date.now()};
+  S.lastGua=GUA;save();closeM();renderLiuyao();}
+function yaoBar(yang,mv){const c=mv?" mv":"";
+  return yang?`<span class="bar full${c}"></span>`:`<span class="bar half${c}"></span><span class="bar half${c}"></span>`;}
+function renderLiuyao(){
+  const meta=document.getElementById("ly_meta"),pan=document.getElementById("ly_pan");if(!meta)return;
+  const now=new Date(),eff=effectiveDayDate(now),dP=dayPillarForCivil(eff),mP=monthPillar(eff);
+  const kg=[(dP.zhi-dP.gan+10)%12,(dP.zhi-dP.gan+11)%12].map(z=>ZHI[z]);
+  const dayLine=`日辰 <b>${dP.gz}</b> · 月建 <b>${mP.gz[1]}月</b> · 旬空 <b>${kg.join("")}</b>`;
+  if(!GUA){meta.innerHTML=dayLine;
+    pan.innerHTML='<div class="muted" style="text-align:center;padding:28px 0">点「摇卦」起一卦，或「手动布爻」</div>';return;}
+  if(document.getElementById("ly_q")&&!document.getElementById("ly_q").value&&GUA.q)document.getElementById("ly_q").value=GUA.q;
+  const benKey=GUA.lines.map(l=>l.yang?"1":"0").join("");
+  const bianKey=GUA.lines.map(l=>(l.yang^l.moving)?"1":"0").join("");
+  const benP=PMAP[benKey],bianP=PMAP[bianKey],benNa=naJia(benKey),bianNa=naJia(bianKey);
+  const hasMv=GUA.lines.some(l=>l.moving);
+  const sStart=[0,0,1,1,2,3,4,4,5,5][dP.gan], shen=i=>SX6[(sStart+i)%6];
+  const shi=benP.shi, ying=shi>3?shi-3:shi+3;
+  meta.innerHTML=`${GUA.q?`<div>所问：${GUA.q}</div>`:''}<div>${dayLine}</div>
+    <div style="margin-top:4px"><span class="gn">${guaName(benKey)}</span> <span class="muted">${benP.palace}宫</span>`
+    +(hasMv?` <span class="muted">之</span> <span class="gn">${guaName(bianKey)}</span> <span class="muted">${bianP.palace}宫</span>`:'')+`</div>`;
+  let rows=`<tr class="hd"><td>六神</td><td>六亲</td><td>纳甲</td><td class="ly-yao">卦象</td><td></td><td></td><td style="text-align:right">变卦</td></tr>`;
+  for(let i=5;i>=0;i--){const l=GUA.lines[i],na=benNa[i],lq=liuqin(benP.wx,na.zhi);
+    const w=WXNAME[ZWX[ZHI.indexOf(na.zhi)]];
+    const kong=kg.includes(na.zhi)?'<span class="ly-kong">空</span>':'';
+    const mvs=l.moving?(l.yang?'○':'×'):'';
+    const sy=(i+1)===shi?'<span class="ly-shi">世</span>':((i+1)===ying?'<span class="ly-ying">应</span>':'');
+    let bian='';if(l.moving){const b=bianNa[i];bian=`<span class="ly-liu">${liuqin(benP.wx,b.zhi)}</span> <b>${b.gan}${b.zhi}</b>`;}
+    rows+=`<tr><td class="ly-sx">${shen(i)}</td><td class="ly-liu">${lq}</td>
+      <td class="ly-gz">${na.gan}${na.zhi}<span class="w">${w}</span>${kong}</td>
+      <td class="ly-yao">${yaoBar(l.yang,l.moving)}</td>
+      <td class="ly-move">${mvs}</td><td class="ly-sy">${sy}</td>
+      <td class="ly-bian">${bian}</td></tr>`;}
+  pan.innerHTML=`<table class="ly-table">${rows}</table>`;
+}
+
 buildDial();render();updateStatus();
 setInterval(tickDial,1000);
 setInterval(renderTop,60000);
